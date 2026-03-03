@@ -1,17 +1,22 @@
 package main
 
-import "net"
+import (
+	"fmt"
+	"log/slog"
+	"net"
+)
 
 const defaultAddr = ":9090"
 
 type Config struct {
 	ListenAddr string
-
 }
 
 type Server struct {
 	Config
-	ln net.Listener
+	peers       map[*Peer]bool
+	ln          net.Listener
+	addPeerChan chan *Peer
 }
 
 func NewServer(config Config) *Server {
@@ -20,7 +25,9 @@ func NewServer(config Config) *Server {
 	}
 
 	return &Server{
-		Config: config,
+		Config:      config,
+		peers:       make(map[*Peer]bool),
+		addPeerChan: make(chan *Peer),
 	}
 }
 
@@ -30,9 +37,47 @@ func (s *Server) Listen() error {
 		return err
 	}
 	s.ln = ln
-	return nil
+
+	go s.run()
+
+	return s.acceptLoop()
 }
 
-func main()  {
-	
+func (s *Server) run() {
+	for {
+		select {
+		case peer := <-s.addPeerChan:
+			s.peers[peer] = true
+		default:
+			fmt.Println("no peer to add")
+		}
+	}
+}
+
+func (s *Server) acceptLoop() error {
+	for {
+		conn, err := s.ln.Accept()
+		if err != nil {
+			slog.Error("error while accepting connection", "err", err)
+			continue
+		}
+		go s.handleConnection(conn)
+	}
+}
+
+func (s *Server) handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	peer := NewPeer(conn)
+	s.addPeerChan <- peer
+
+	go peer.readLoop()
+}
+
+func main() {
+	server := NewServer(Config{})
+	err :=server.Listen()
+	if err != nil {
+		slog.Error("error while starting server", "err", err)
+	}
 }
