@@ -13,9 +13,9 @@ type Config struct {
 
 type Server struct {
 	Config
-	peers       map[*Peer]bool
-	ln          net.Listener
-	addPeerChan chan *Peer
+	peers          map[*Peer]bool
+	ln             net.Listener
+	addPeerChan    chan *Peer
 	removePeerChan chan *Peer
 }
 
@@ -25,9 +25,9 @@ func NewServer(config Config) *Server {
 	}
 
 	return &Server{
-		Config:      config,
-		peers:       make(map[*Peer]bool),
-		addPeerChan: make(chan *Peer),
+		Config:         config,
+		peers:          make(map[*Peer]bool),
+		addPeerChan:    make(chan *Peer),
 		removePeerChan: make(chan *Peer),
 	}
 }
@@ -40,6 +40,8 @@ func (s *Server) Listen() error {
 	s.ln = ln
 
 	go s.run()
+
+	slog.Info("server started", "addr", s.ListenAddr)
 
 	return s.acceptLoop()
 }
@@ -72,12 +74,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 	peer := NewPeer(conn)
 	s.addPeerChan <- peer
 
-	go peer.readLoop()
+	slog.Info("new peer connected", "addr", conn.RemoteAddr())
+
+	peer.readLoop()
 }
 
 func main() {
 	server := NewServer(Config{})
-	err :=server.Listen()
+	err := server.Listen()
 	if err != nil {
 		slog.Error("error while starting server", "err", err)
 	}
