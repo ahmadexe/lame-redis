@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net"
 )
@@ -71,14 +72,27 @@ func (s *Server) acceptLoop() error {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	peer := NewPeer(conn)
+	msgChan := make(chan string)
+
+	peer := NewPeer(conn, msgChan)
+
 	s.addPeerChan <- peer
 
 	slog.Info("new peer connected", "addr", conn.RemoteAddr())
 
+	go s.handleReads(msgChan)
+
 	if err := peer.readLoop(); err != nil {
 		slog.Error("error while reading from peer", "remoteAddr", conn.RemoteAddr(), "err", err)
 	}
+}
+
+func (s *Server) handleReads(msgChan chan string) {
+	for msg := range msgChan {
+		fmt.Println(msg)
+	}
+
+	slog.Info("peer disconnected")
 }
 
 func main() {
