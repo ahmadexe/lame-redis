@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net"
 )
@@ -17,6 +16,7 @@ type Server struct {
 	peers       map[*Peer]bool
 	ln          net.Listener
 	addPeerChan chan *Peer
+	removePeerChan chan *Peer
 }
 
 func NewServer(config Config) *Server {
@@ -28,6 +28,7 @@ func NewServer(config Config) *Server {
 		Config:      config,
 		peers:       make(map[*Peer]bool),
 		addPeerChan: make(chan *Peer),
+		removePeerChan: make(chan *Peer),
 	}
 }
 
@@ -48,8 +49,8 @@ func (s *Server) run() {
 		select {
 		case peer := <-s.addPeerChan:
 			s.peers[peer] = true
-		default:
-			fmt.Println("no peer to add")
+		case peer := <-s.removePeerChan:
+			delete(s.peers, peer)
 		}
 	}
 }
