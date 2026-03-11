@@ -47,6 +47,20 @@ func (s *Server) Listen() error {
 	return s.acceptLoop()
 }
 
+func (s *Server) handleRawMessage(msg string) {
+	cmd, err := parseCommand(msg)
+	if err != nil {
+		slog.Error("failed to parse command", "err", err)
+		return
+	}
+
+	switch cmd.Name() {
+	case CMD_SET:
+		fmt.Printf("Set called, key: %s, value: %s\n", cmd.(SetCommand).Key, cmd.(SetCommand).Value)
+	}
+
+}
+
 func (s *Server) run() {
 	for {
 		select {
@@ -89,7 +103,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 func (s *Server) handleReads(msgChan chan string) {
 	for msg := range msgChan {
-		fmt.Println(msg)
+		s.handleRawMessage(msg)
 	}
 
 	slog.Info("peer disconnected")
