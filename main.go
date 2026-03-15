@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
+
+	"github.com/ahmadexe/lame-redis/client"
 )
 
 const defaultAddr = ":9090"
@@ -110,9 +114,19 @@ func (s *Server) handleReads(msgChan chan string) {
 }
 
 func main() {
-	server := NewServer(Config{})
-	err := server.Listen()
-	if err != nil {
-		slog.Error("error while starting server", "err", err)
+	go func() {
+		server := NewServer(Config{})
+		err := server.Listen()
+		if err != nil {
+			slog.Error("error while starting server", "err", err)
+		}
+	}()
+	time.Sleep(time.Second)
+	client := client.NewClient("localhost:9090")
+	if err := client.Set(context.Background(), "foo", "bar"); err != nil {
+		slog.Error("failed to set", "err", err)
+		panic("fail")
 	}
+
+	select {}
 }
