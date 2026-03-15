@@ -22,6 +22,9 @@ type Server struct {
 	ln             net.Listener
 	addPeerChan    chan *Peer
 	removePeerChan chan *Peer
+
+	// Data Structure
+	kv *KeyVal
 }
 
 func NewServer(config Config) *Server {
@@ -29,11 +32,14 @@ func NewServer(config Config) *Server {
 		config.ListenAddr = defaultAddr
 	}
 
+	kv := NewKeyVal()
+
 	return &Server{
 		Config:         config,
 		peers:          make(map[*Peer]bool),
 		addPeerChan:    make(chan *Peer),
 		removePeerChan: make(chan *Peer),
+		kv:             kv,
 	}
 }
 
@@ -51,17 +57,20 @@ func (s *Server) Listen() error {
 	return s.acceptLoop()
 }
 
-func (s *Server) handleRawMessage(msg string) {
+func (s *Server) handleRawMessage(msg string) error {
 	cmd, err := parseCommand(msg)
 	if err != nil {
 		slog.Error("failed to parse command", "err", err)
-		return
+		return err
 	}
 
 	switch cmd.Name() {
 	case CMD_SET:
-		fmt.Printf("Set called, key: %s, value: %s\n", cmd.(SetCommand).Key, cmd.(SetCommand).Value)
+		s.kv.Set(cmd.(SetCommand).Key, cmd.(SetCommand).Value)
+		return nil
 	}
+
+	return nil
 
 }
 
@@ -114,8 +123,8 @@ func (s *Server) handleReads(msgChan chan string) {
 }
 
 func main() {
+	server := NewServer(Config{})
 	go func() {
-		server := NewServer(Config{})
 		err := server.Listen()
 		if err != nil {
 			slog.Error("error while starting server", "err", err)
@@ -123,9 +132,12 @@ func main() {
 	}()
 	time.Sleep(time.Second)
 	client := client.NewClient("localhost:9090")
-	if err := client.Set(context.Background(), "foo", "bar"); err != nil {
-		slog.Error("failed to set", "err", err)
-		panic("fail")
+
+	for i := 0; i < 10; i++ {
+		err := client.Set(context.Background(), fmt.Sprintf("Key_%d", i), fmt.Sprintf("value_%d", i))
+		if err != nil {
+			slog.Error("error while setting value", "err", err)
+		}
 	}
 
 	select {}
